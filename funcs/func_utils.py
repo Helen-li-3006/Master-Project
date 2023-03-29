@@ -48,7 +48,7 @@ def mod_merge(left, right):
 def mod_merge_sort(deg):
     """
     Take a list of sympy arrays (weighted degree) and sort by the term 
-    order induced by the weigh system via merge sort (efficient sorting 
+    order induced by the weight system via merge sort (efficient sorting 
     algorithm on python)
 
     Input:
@@ -64,7 +64,7 @@ def mod_merge_sort(deg):
     midpoint = len(deg)//2
     return mod_merge(mod_merge_sort(deg[:midpoint]), mod_merge_sort(deg[midpoint:]))
 
-def leading_term(W, poly, gens):
+def leading_term(W, poly, gens, ret_all = False):
     """
     For a polynomial, compute the leading term based on a weight system
 
@@ -75,20 +75,23 @@ def leading_term(W, poly, gens):
 
     Output: 
     ht: tuple of powers of the leading term monomial
-    gens: n-len list of variables 
     """
     # Decompose the polynomial into a list of monomials
     monos = [mon for mon in poly.monoms()]
-    degs = [weighted_deg(W, pow) for pow in monos]
+    degs = [weighted_deg(W, pow) for pow in monos] # Weighted degrees
 
     # Select and return monomial of the largest weighted deg
     if sy.shape(W)[0] > 1:
         sorted_deg = mod_merge_sort(degs)
-        return monos[degs.index(sorted_deg[-1])], gens
+        sorted_deg = sorted_deg[::-1]
+        sorted_monom = [monos[degs.index(i)] for i in sorted_deg]
     else:
-        max_id = np.argmax(degs)
-        ht = monos[max_id]
-    return ht, gens
+        sorted_deg = sorted(degs)
+        sorted_monom = [monos[degs.index(i)] for i in sorted_deg]
+    if ret_all == True:
+        return (sorted_monom[0], sorted_monom)
+    else:
+        return sorted_monom[0]
 
 def tup_lcm(mon1, mon2):
     """
@@ -104,3 +107,87 @@ def tup_lcm(mon1, mon2):
     for i in range(len(mon1)):
         lcm.append(np.max([mon1[i], mon2[i]]))
     return tuple(lcm)
+
+def S_poly(f, g, W, gens):
+    """
+    Compute the S-polynomial of polynomials f and g wrt weight system 
+    W (which represents a term ordering)
+
+    Inputs:
+    f,g: Sympy polynomials with n variables
+    W: nxr Sympy matrix that is a weight system
+    gens: list of n variables defined in sympy class
+
+    Output:
+    S: S-polynomial S(f,g), sympy polynomial class
+    """
+    # Change into dictionary class for ease of computation
+    f_dict = f.as_dict()
+    g_dict = g.as_dict()
+    # Leading terms as power tuple
+    f_lt = leading_term(W, f, gens)
+    g_lt = leading_term(W, g, gens)
+    lt_lcm = tup_lcm(f_lt, g_lt)
+    num = sy.polys.Poly.from_dict({lt_lcm: 1.}, gens)
+    S = (num/sy.polys.Poly.from_dict({f_lt:f_dict.get(f_lt)},gens))*f - (num/sy.polys.Poly.from_dict({g_lt:g_dict.get(g_lt)},gens))*g
+    return sy.factor(S, gens)
+
+
+def is_divisible(f1, f2, W, gens):
+    """
+    Return boolean value stating whether ht(f1) is divisible by ht(f2), such that 
+    there is a scalar c and monomial x^a that ht(f1) = cx^a ht(f2)
+    
+    Inputs:
+    f1: Sympy polynomial class
+    f2: Sympy polynomial class
+    W: Sympy matrix that is a weight system 
+    gens: variables x_i
+
+    Output:
+    is_div: Boolean
+    """
+    ht1 = leading_term(W, f1, gens)
+    ht2 = leading_term(W, f2, gens)
+    diff_bool = [0 if ht1[i]>=ht2[i] else 1 for i in range(len(ht1))]
+    if sum(diff_bool) > 0:
+        return False
+    else:
+        return True
+
+
+def normalf(W, F, f, gens):
+    """
+    Impelemnt division algorithm to check if polynomial f is in the span of F
+
+    Input:
+    (remove) HThc: Dictionary that denotes leading term of f_1, ... f_2 as (power tuple): leading coefficient
+    f: The polynomial in sympy polynomial form - polynomial to apply top reduction
+    F: List of sympy polynomials - 'Groebner basis'
+    gens: List of symbols 
+
+    Output:
+    g: normal form of a polynomial w.r.t F
+    """
+    # Initialise variables
+    g = f
+    ind = 0
+    # Order leading terms (HThc) into decreasing order
+    #temp_poly = {ht:1. for ht in HThc}
+    #temp_poly = sy.polys.Poly.from_dict(temp_poly, gens)
+    #HThc = leading_term(sy.Matrix(np.ones(len(gens))), temp_poly, gens, ret_all=True)[1]
+    while g != 0 and ind < len(F):
+        if is_divisible(f,F[ind], W, gens):
+            f1_dict = g.as_dict()
+            f2_dict = F[ind].as_dict()
+            f1_ht = leading_term(W, g, gens)
+            f2_ht = leading_term(W,F[ind], gens)
+            coef = f1_dict.get(f1_ht)/f2_dict.get(f2_ht)
+            lcm_tup = tup_lcm(f1_ht, f2_ht)
+            mult = tuple(map(lambda i, j: i - j, lcm_tup, f2_ht))
+            g -= sy.polys.Poly.from_dict({mult:coef}, gens) * F[ind]
+            ind += 1
+        else:
+            pass
+    return g
+
