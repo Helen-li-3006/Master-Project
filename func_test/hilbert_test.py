@@ -11,8 +11,9 @@ Ims = [(0,0,3,0), (0,0,0,4)]
 # Example uses Lex ordering
 W = sy.Matrix([[1,1,1,1]])
 
-hilb = hilbert(Ims, W, x)
+hilb, l = hilbert(Ims, W, x)
 hilbnum = hilbinumerator(Ims, W, x, sy.symbols('l'))
 print('Numerator of the Hilbert series is:', hilbnum)
 print('Full Hilbert series is ', hilb)
+print('Expanded series up to order 5 is', hilb_expand(hilb, l, [5]))
 

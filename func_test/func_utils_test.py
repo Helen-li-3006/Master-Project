@@ -50,4 +50,10 @@ f = sy.polys.Poly.from_dict({(1,1,0):1.}, x)
 g = normalf(W, F, f, x)
 print('Normal form of ', f, ' and ', F, ' is ', g)
 
-
+# Test for edge case of division algorithm (g=0)
+x = sy.symbols('x')
+F = [sy.Poly(x, x)]
+W = sy.Matrix([1])
+f = sy.Poly('x**2', x)
+g = normalf(W, F, f, x)
+print('Normal form of ', f, ' and ', F, ' is ', g)

@@ -34,17 +34,13 @@ def hilbinumerator(Ims, W, gens, l):
         alp_deg = weighted_deg(W, xalp)
         numi = 1. - sy.polys.Poly.from_dict({tuple(alp_deg):1.}, l)
         for j in range(1,len(Ims)):
-            print(numi)
             Jms = [tuple(np.subtract(tup_lcm(Ims[i], Ims[j]), Ims[j])) for i in range(j)]
-            print('Jms', Jms)
             # Find the weighted degree for all tuples in Jms
             J_deg = [tuple(weighted_deg(W, mon)) for mon in Jms]
             # List all non-linear monomials in Jms
             J1ms = [Jms[ind] for ind in range(len(J_deg)) if np.mean(J_deg[ind]) != 1]
             # List all linear monomials in Jms
             J_lin = [Jms[ind]for ind in range(len(J_deg)) if np.mean(J_deg[ind]) == 1]
-            print('J1ms', J1ms)
-            print('J_lin', J_lin)
             numJ1 = hilbinumerator(J1ms, W, gens, l)
             numJ = numJ1
             for lin_term in J_lin:
@@ -77,7 +73,26 @@ def hilbert(Ims, W, gens):
         xi= tuple(np.eye(1,n,i).astype(int).reshape(-1))
         Wij = weighted_deg(W, xi)
         hilb = sy.factor(hilb/(1.- sy.polys.Poly.from_dict({tuple(Wij):1.},l)))
-    return hilb
+    return hilb, l
+
+def hilb_expand(hilb, ls, orders):
+    """
+    Expand the hilbert series up to an order
+
+    Inputs:
+    hilb: Hilbert series
+    ls: generators of the hilbert series (l_1, ..., l_r)
+    orders: list of orders for each variabelt to expand up to
+    
+    Output: 
+    exp_hilb: Expanded 
+    """
+    exp_hilb = hilb
+    for i in range(len(orders)):
+        exp_hilb = exp_hilb.series(ls[i], 0, orders[i])
+    return exp_hilb.as_poly()
+        
+
 
 def molien(G, form=None, haar=None):
     """
