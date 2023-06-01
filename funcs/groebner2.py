@@ -6,73 +6,43 @@ that computes the multi-truncated Groebner basis w.t.r a multigrading.
 """
 Double check the definition of space S and construction of the S set
 """
+import numpy as np
+from funcs.func_utils import *
+from funcs.hilbert import *
 
-from faulthandler import cancel_dump_traceback_later
-from math import lcm
-from func_utils import *
-from hilbert import *
-
-def min_deg(poly, grading, gens):
-    """
-    Return the minimum degree (vector for multigrading) for a polynomial (hilbert function)
-    with respect to grading
-    
-    Inputs:
-    poly: Hilbert function as a polynomial
-    grading: m x s sympy matrix representing a weight system corresponds to a (multi) grading
-
-    Outputs: Power tuple of the minimal degree term w.r.t grading
-
-    """
-    pows = [key for key, item in poly]
-    pows_inc = leading_term(grading, poly, gens, re_all = True)
-    return pows_inc[-1] #return minimal power tuple
-
-def compare_degs(deg1, deg2, W):
-    """
-    Return the boolean for deg1 <= deg2 (vector degrees frm multigrading) w.r.t term order 
-    defined by weight system W
-
-    Inputs:
-    deg1, deg2: power tuples
-    W : m x r Sympy matrix representing a term order
-    """
-    gens = sy.symbols('x_0:{}'.format(len(deg1)))
-    poly = sy.polys.Poly.from_dict({deg1:1., deg2:1.}, )
-    if deg1 == min_deg(poly, W, gens):
-        return True
-    return False
-
-def equate_powers(deg1, deg2, W):
-    return True if weighted_deg(deg1, W) == weighted_deg(deg2, W) else False
-
-def update_hp(F_ht, W_sub, d, x):
-    hp_ht, ls = hilbert(F_ht, W_sub, x) # Coef b_i in algorithm
-    hp_ht = hilb_expand(hp_ht, ls, list(d))
+def update_hp(F, W_sub, d, x):
+    hp_ht, ls = hilbert(F, W_sub, x) # Coef b_i in algorithm
+    hp_ht = hilb_expand(hp_ht, ls, d)
     return hp_ht, ls
 
-def update_Cdelta(hp_ht, hp_sub, U, ls):
-    hp_diff = hp_ht - hp_sub
-    delta = min_deg(hp_diff.as_dict(), U, ls)
-    c_delta = hp_diff.as_dict()[delta]
-    return delta, c_delta
+def update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom, update_S = False):
+    while len(delta_list) != 0:
+        delta = delta_list.pop()
+        c_delta = sy.poly(hp_diff).as_dict()[delta]
+        E = mod_merge_sort([key for key in sy.poly(HP_diff).as_dict().keys() if key[:s] == delta])[::-1]
+        while len(E) != 0:
+            delta_epsilon = E.pop()
+            D_epsilon = sy.poly(HP_diff).as_dict()[delta_epsilon]
+            if update_S:
+                S = [pair for pair in S if compare_degs(delta_epsilon, weighted_deg(W,leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)))]
+            delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
+            if len(delta_eps_S) >0:
+                # Stop the climbing process everytime when the minimal non-empty graded syzygies is found
+                return delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon
+    # Returns empty lists when all possible delta, epsilon are exhausted, should result in termination of algorithm
+    # In this case, I think the C, D should be 0? and delta == d
+    return delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon
 
-def update_Depsilon(HP_diff, delta_r, W, l):
-    # Find the set E of possible r-s degrees
-    E = {key: 1.0 for key in HP_diff.as_dict().keys() if is_divisible(sy.polys.Poly.from_dict({key:1.0}, l), sy.polys.Poly.from_dict({delta_r:1.}, l), W, l)}
-    delta_epsilon = min_deg(sy.polys.Poly.from_dict(E), W, l)
-    D_epsilon = HP_diff.as_dict()[delta_epsilon]
-    return delta_epsilon, D_epsilon, E
-
-def get_slice_E(E, delta, W, S, F, x):
-    slice_delta_E = []
-    for e in E:
-        delta_e = delta + tuple(e)
-        slice_delta_e = [pair for pair in S if equate_powers(weighted_deg(W, leading_term(W, S_poly(F[pair[0]], F[pair[1]], W, x), x)), delta_e, W)]
-        slice_delta_E.append(slice_delta_e)
-    return slice_delta_E
-
-def dtrunc_groebner(W, s, U, d, F, hp, x, l):
+def update_epsilon(E, GB, HP_diff, S, W, x, dom):
+    """se this function if only increase in epsilon is interested"""
+    while len(E) != 0:
+        delta_epsilon = E.pop()
+        D_epsilon = sy.poly(HP_diff).as_dict()[delta_epsilon]
+        delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
+        if len(delta_eps_S) >0:
+            # Stop the climbing process everytime when the minimal non-empty graded syzygies is found
+            return E, delta_epsilon, D_epsilon, delta_eps_S
+def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
     """
     Implementation of algorithm 1.2.23 from Gaterman's paper
     that exploits the graded strucutre of the polynomial ring to 
@@ -84,88 +54,111 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l):
     s: minimal s such that W_1, ..., W_s is a valid weight system (subsystem of W)
     U: n x t Weight matrix that represents a set of grading, corresponds to a termm ordering
     d: t-length tuple that is the maximal degree for elements of the Groebner basis
-    F: Set of m U,W homogeneous polynomials that generates an ideal I, list of Sympy polynomials
+    F: Set of m U,W homogeneous polynomials that is an ideal I, list of Sympy polynomials
     hp: Hilbert series of graded module K[x]/I w.r.t W (coefficient c_i)
     x: Sympy symbols for variables in polynomial ring K[x]
     l: Sympy symbols for hp (l_1, ..., l_r)
+    dom: domain of the polynomial ring
     """
     # Initialisation 
     GB = F
     m = len(F)
-    hp = hilb_expand(hp, l, list(d)) # Expand hilbert series up to truncated degree
+    ls = l[:s]
+    hp = hilb_expand(hp, l, d) # Expand hilbert series up to truncated degree
     W_sub = W[:s, 0:] # Sub-system of W_1, ..., W_r
-    F_dict = [pol.as_dict() for pol in F] # List of polynomials as power: coef
-    F_ht = [leading_term(U, pol, x) for pol in F] # List of leading terms w.r.t U (term order)
+    F_hthc = [leading_term(U, pol, x, inc_coef=True) for pol in F] # List of leading terms w.r.t U (term order)
+    F_ht = [list(dic.keys())[0] for dic in F_hthc]
     # Compute the tentative hilbert series and reduce hp to subsystem
     sub_dict = {l[i]:ls[i] for i in range(len(ls))}
     sub_dict.update({l[i]:1. for i in range(len(ls), len(l))})
     hp_sub = hp.subs(sub_dict) # Coef a_i in algorithm
-    hp_ht, ls = update_hp(F_ht, W_sub, d, x)
-    if hp_sub == hp_ht:
-        return GB # no polynomial to find
-    delta, c_delta = update_Cdelta(hp_ht, hp_sub, U, ls)
-    delta_r = delta + tuple([0 for i in range(W.shape[0] - s)])
-    if compare_degs(d, delta):
-        return GB # no polynomials to find
+    hp_ht, ls = update_hp(F_ht, W_sub, d, x) # Coef b_i in algorithm
+    hp_diff = hp_ht - hp_sub
+    if hp_diff == 0:
+        return GB, ['identical hp series'] # no polynomial to find
     HP, l = update_hp(F_ht, W, d, x) # coef d_i in algorithm
-    HP_diff = HP - hp
-    delta_epsilon, D_epsilon, E = update_Depsilon(HP_diff, delta_r, W, l)
+    HP_diff = HP - hp    
+    # Initialise parameters
+    delta_list = mod_merge_sort(list(sy.poly(hp_diff, ls).as_dict().keys()))[::-1]
+    delta = delta_list.pop()
+    c_delta = sy.poly(hp_diff).as_dict()[delta]
+    E = mod_merge_sort([key for key in sy.poly(HP_diff).as_dict().keys() if key[:s] == delta])[::-1]
+    delta_epsilon = E.pop()
+    D_epsilon = sy.poly(HP_diff).as_dict()[delta_epsilon]
     # Define the set S of pairs of indices that corresponds to syzygies
-    U_lcm = {(i,j) : weighted_deg(U, tup_lcm(F_ht[i], F_ht[j])) for j in range(m) for i in range(j)}
-    W_lcm = {(i,j) : weighted_deg(W, tup_lcm(F_ht[i], F_ht[j])) for j in range(m) for i in range(j)}
-    S = [key for key in W_lcm if compare_degs(U_lcm[key], d, U) and compare_degs(W_lcm[key], delta_epsilon, W)]
-    if len(S) == 0:
-        return GB
-    delta_eps_S = [pair for pair in S if equate_powers(weighted_deg(W, leading_term(W, S_poly(F[pair[0]], F[pair[1]], W, x), x)), delta_epsilon, W)]
+    U_lcm = {(i,j) : tuple(weighted_deg(U, tup_lcm(F_ht[i], F_ht[j]))) for j in range(m) for i in range(j)}
+    W_lcm = {(i,j) : tuple(weighted_deg(W, tup_lcm(F_ht[i], F_ht[j]))) for j in range(m) for i in range(j)}
+    S = [key for key in W_lcm.keys() if compare_degs(U_lcm[key], tuple(d)) and compare_degs(delta_epsilon, W_lcm[key])]
+    # Initialise the graded syzygies
+    delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
+    # List of all possible delta without changing coefficients (no added GB terms) in descending order
+    if compare_degs(tuple(d), delta):
+        return GB, ['reached max order d'] # no polynomials to find
+    # Compute the graded delta_epsilon degree of S_polynomials 
     if len(delta_eps_S) == 0:
-        """
-        Double check the logic of updating parameters - how and when are series updated?
-        """
-        # Update both hilbert series
-        hp_ht, ls = update_hp(F_ht, W_sub, d, x)
-        HP, l = update_hp(F_ht, W, d, x)
-        # Update parameters
-        delta, c_delta = update_Cdelta(hp_ht, hp_sub, U, ls)
-        delta_r = delta + tuple([0 for i in range(W.shape[0] - s)])
-        delta_epsilon, D_epsilon, E = update_Depsilon(HP, hp, delta_r, W, l)
+        delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
+    if len(S) == 0:
+        return GB, ['no available pairs']
+    #print('C, D', c_delta, D_epsilon)
     while len(S) > 0:
         # Get slice where deg_U <= d and deg_W = delta_epsilon
-        slice = [pair for pair in delta_eps_S if compare_degs(leading_term(U, S_poly(F[pair[0]], F[pair[1]], U, x), x), d, U)]
-        pair = slice.pop()
+        #slice = [pair for pair in delta_eps_S if compare_degs(weighted_deg(U, leading_term(U, S_poly(F[pair[0]], F[pair[1]], U, x), x)), tuple(d))]
+        #print(delta_eps_S, 'slice')
+        pair = delta_eps_S.pop()
         S.remove(pair)
-        g = normalf(U, GB, S_poly(F[pair[0]], F[pair[1]], U, x))
-        if g != sy.Poly(0.0, x):
+        g = normalf(U, GB, S_poly(GB[pair[0]], GB[pair[1]], U, x, dom), x, dom)
+        #print(g)
+        if not g.is_zero:
             GB.append(g)
-            F_ht.append(leading_term(U, g, x))
+            F_hthc.append(leading_term(U, g, x, inc_coef=True))
+            F_ht.append(list(F_hthc[-1].keys())[0])
             m += 1
             c_delta -= 1
             D_epsilon -= 1
-            S_im_slice = [(i,m) for i in range(m) if 
-                          compare_degs(leading_term(U, S_poly(F[i], F[m], U, x), x), d, U) and 
-                          compare_degs(delta_epsilon, leading_term(W, S_poly(F[i], F[m], W, x), x), W)]
+            # Add the extra valid combinations to S
+            S_im_slice = [(i,m-1) for i in range(m) if 
+                          compare_degs(weighted_deg(U,leading_term(U, S_poly(GB[i], GB[m-1], U, x, dom), x)), tuple(d)) and 
+                          compare_degs(delta_epsilon, weighted_deg(W,leading_term(W, S_poly(GB[i], GB[m-1], W, x, dom), x)))]
+            S.extend(S_im_slice)
+            #delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
+            #print(E, 'E')
+            #print(D_epsilon, 'D')
+            #delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
+            #print(S, 'after S_im_slice')
             if D_epsilon == 0:
-                E.remove(delta_epsilon[s:])
-                S_delta_E_slice = get_slice_E(E, delta, W, S, F, x)
-                if len(E) == 0 or len(S_delta_E_slice) == 0:
+                # Move to the next epsilon if there are other possible epsilons
+                if len(E) > 0: 
+                    E, delta_epsilon, D_epsilon, delta_eps_S = update_epsilon(E, GB, HP_diff, S, W, x, dom)
+                    #print(delta_eps_S, 'slice after D exhausted - more possible epsilons')
+                elif len(E) == 0 or len(delta_eps_S) == 0:
+                    # Case when no more possible epsilons are available - move to a different delta
+                    # Re-calculate hp functions and epsilon, E, S with respect to the new GB
                     hp_ht, ls = update_hp(F_ht, W_sub, d, x)
                     HP, l = update_hp(F_ht, W, d, x)
                     HP_diff = HP - hp
-                    delta, c_delta = update_Cdelta(hp_ht, hp_sub, U, ls, s, W.shape[0])
-                    delta_r = delta + tuple([0 for i in range(W.shape[0] - s)])
-                    delta_epsilon, D_epsilon, E = update_Depsilon(HP_diff, delta_r, W, l)
-                    S = [pair for pair in S if compare_degs(delta_epsilon, leading_term(W, S_poly(F[pair[0]], F[pair[1]], W, x), x), W)]
-                delta_epsilon = min_deg(sy.polys.Poly.from_dict(E), W, l)
-                D_epsilon = HP_diff.as_dict()[delta_epsilon]
-                S = [pair for pair in S if compare_degs(delta_epsilon, leading_term(W, S_poly(F[pair[0]], F[pair[1]], W, x), x), W)]
+                    hp_diff = hp_ht - hp_sub
+                    # Initialise new delta_list
+                    delta_list = mod_merge_sort(list(sy.poly(hp_diff, ls).as_dict().keys()))[::-1]
+                    if hp_diff == 0:
+                        return GB, ['identical hp series']
+                    delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom, update_S=True)
+                    #print(delta_eps_S, 'slice after D exhausted - no more possible eps')
+                    #print(E, 'Epsilon_list')
+            # When there are still epsilon options, choose the next smallest (delta,epsilon) degree and repeat the process
             if c_delta == 0:
+                # Exhausted all possible delta-degree polyomials, recompute hp series and move on to the next delta degree
+                # Re-calcualtes epsilon sub-degrees to the new delta degree
                 hp_ht, ls = update_hp(F_ht, W_sub, d, x)
                 HP, l = update_hp(F_ht, W, d, x)
                 HP_diff = HP - hp
-                delta, c_delta = update_Cdelta(hp_ht, hp_sub, U, ls, s, W.shape[0])
-                delta_r = delta + tuple([0 for i in range(W.shape[0] - s)])
-                delta_epsilon, D_epsilon, E = update_Depsilon(HP_diff, delta_r, W, l)
-                S = [pair for pair in S if compare_degs(delta_epsilon, leading_term(W, S_poly(F[pair[0]], F[pair[1]], W, x), x), W)]
-    return GB
+                hp_diff = hp_ht - hp_sub
+                if hp_sub == hp_ht:
+                    return GB, ['identical hp series']
+                # Compute the new delta list
+                delta_list = mod_merge_sort(list(sy.poly(hp_diff).as_dict().keys()))[::-1]
+                delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom, update_S=True)
+                #print(delta_eps_S, 'slice after C exhausted')
+    return GB, ['end of iterations']
 
 
 

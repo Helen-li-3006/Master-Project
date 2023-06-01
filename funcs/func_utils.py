@@ -15,7 +15,7 @@ def weighted_deg(W, pow):
     Output:
     m-length array, weighted degree of monomial under each sub-grading
     """
-    return W * sy.Matrix(pow)
+    return tuple(W * sy.Matrix(pow))
 
 def mod_merge(left, right):
     """
@@ -31,7 +31,7 @@ def mod_merge(left, right):
     index_left = index_right = 0
 
     while len(result) < len(left) + len(right):
-        if max(left[index_left] - right[index_right]) <= 0:
+        if max(np.subtract(left[index_left],right[index_right])) <= 0:
             result.append(left[index_left])
             index_left += 1
         else:
@@ -64,7 +64,7 @@ def mod_merge_sort(deg):
     midpoint = len(deg)//2
     return mod_merge(mod_merge_sort(deg[:midpoint]), mod_merge_sort(deg[midpoint:]))
 
-def leading_term(W, poly, gens, ret_all = False):
+def leading_term(W, poly, gens, ret_all = False, inc_coef = False):
     """
     For a polynomial, compute the leading term based on a weight system
 
@@ -82,14 +82,17 @@ def leading_term(W, poly, gens, ret_all = False):
 
     # Select and return monomial of the largest weighted deg
     if sy.shape(W)[0] > 1:
-        sorted_deg = mod_merge_sort(degs)
-        sorted_deg = sorted_deg[::-1]
+        sorted_deg = mod_merge_sort(degs)[::-1]
         sorted_monom = [monos[degs.index(i)] for i in sorted_deg]
     else:
-        sorted_deg = sorted(degs)
+        degs = [deg[0] for deg in degs]
+        sorted_deg = sorted(degs)[::-1]
         sorted_monom = [monos[degs.index(i)] for i in sorted_deg]
     if ret_all == True:
-        return (sorted_monom[0], sorted_monom)
+        return sorted_monom
+    if inc_coef:
+        # Return a dictionary of {ht(f):hc(f)} (tuple:coef)
+        return {sorted_monom[0]:poly.as_dict()[sorted_monom[0]]}
     else:
         return sorted_monom[0]
 
@@ -108,7 +111,7 @@ def tup_lcm(mon1, mon2):
         lcm.append(np.max([mon1[i], mon2[i]]))
     return tuple(lcm)
 
-def S_poly(f, g, W, gens):
+def S_poly(f, g, W, gens, dom):
     """
     Compute the S-polynomial of polynomials f and g wrt weight system 
     W (which represents a term ordering)
@@ -125,27 +128,24 @@ def S_poly(f, g, W, gens):
     f_dict = f.as_dict()
     g_dict = g.as_dict()
     # Leading terms as power tuple
-    f_lt = leading_term(W, f, gens)
-    g_lt = leading_term(W, g, gens)
-    lt_lcm = tup_lcm(f_lt, g_lt)
-    num = sy.polys.Poly.from_dict({lt_lcm: 1.}, gens)
-    S = (num/sy.polys.Poly.from_dict({f_lt:f_dict.get(f_lt)},gens))*f - (num/sy.polys.Poly.from_dict({g_lt:g_dict.get(g_lt)},gens))*g
-    return sy.factor(S, gens)
+    f_lt = leading_term(W, f, gens) # power tuple
+    g_lt = leading_term(W, g, gens) # power tuple
+    lt_lcm = tup_lcm(f_lt, g_lt) #power tuple
+    num = sy.polys.Poly.from_dict({lt_lcm: 1.}, gens=gens, domain=dom)
+    S = (num/sy.polys.Poly.from_dict({f_lt:f_dict.get(f_lt)},gens=gens, domain=dom))*f - (num/sy.polys.Poly.from_dict({g_lt:g_dict.get(g_lt)},gens=gens, domain=dom))*g
+    return S.set_domain(dom)
 
 
 def is_divisible(f1, f2, W, gens):
     """
-    Return boolean value stating whether ht(f1) is divisible by ht(f2), such that 
-    there is a scalar c and monomial x^a that ht(f1) = cx^a ht(f2)
-    
+    Return boolean variable for if ht(f2)|ht(f1)
     Inputs:
-    f1: Sympy polynomial class
-    f2: Sympy polynomial class
+    f1, f2: Sympy polynomials with respect to the variables gens
     W: Sympy matrix that is a weight system 
     gens: variables x_i
 
     Output:
-    is_div: Boolean
+    is_div: Boolean if statement is satisfied
     """
     ht1 = leading_term(W, f1, gens)
     ht2 = leading_term(W, f2, gens)
@@ -155,16 +155,15 @@ def is_divisible(f1, f2, W, gens):
     else:
         return True
 
-
-def normalf(W, F, f, gens):
+def normalf(W, F, f, gens, dom):
     """
     Impelemnt division algorithm to check if polynomial f is in the span of F
 
     Input:
-    (remove) HThc: Dictionary that denotes leading term of f_1, ... f_2 as (power tuple): leading coefficient
     f: The polynomial in sympy polynomial form - polynomial to apply top reduction
     F: List of sympy polynomials - 'Groebner basis'
     gens: List of symbols 
+    dom: Domain of polynomial reduction
 
     Output:
     g: normal form of a polynomial w.r.t F
@@ -172,10 +171,6 @@ def normalf(W, F, f, gens):
     # Initialise variables
     g = f
     ind = 0
-    # Order leading terms (HThc) into decreasing order
-    #temp_poly = {ht:1. for ht in HThc}
-    #temp_poly = sy.polys.Poly.from_dict(temp_poly, gens)
-    #HThc = leading_term(sy.Matrix(np.ones(len(gens))), temp_poly, gens, ret_all=True)[1]
     while g != 0 and ind < len(F):
         if is_divisible(f,F[ind], W, gens):
             f1_dict = g.as_dict()
@@ -185,9 +180,38 @@ def normalf(W, F, f, gens):
             coef = f1_dict.get(f1_ht)/f2_dict.get(f2_ht)
             lcm_tup = tup_lcm(f1_ht, f2_ht)
             mult = tuple(map(lambda i, j: i - j, lcm_tup, f2_ht))
-            g -= sy.polys.Poly.from_dict({mult:coef}, gens) * F[ind]
+            g -= sy.polys.Poly.from_dict({mult:coef}, gens=gens, domain=dom) * F[ind]
             ind += 1
         else:
+            ind += 1
             pass
     return g
+
+def min_deg(poly, gens):
+    """
+    Return the minimum degree (vector for multigrading) for a polynomial (hilbert function)
+    with respect to grading
+    
+    Inputs:
+    poly: Hilbert function as a polynomial
+    grading: m x s sympy matrix representing a weight system corresponds to a (multi) grading
+    Outputs: Power tuple of the minimal degree term w.r.t grading
+
+    """
+    pows = [np.array(key) for key in poly.as_dict().keys()]
+    pows_inc = mod_merge_sort(pows)
+    return pows_inc[0] #return minimal power tuple
+
+def compare_degs(deg1, deg2):
+    """
+    Compare 2 weighted degrees with respect to the same weight system
+    Inputs:
+    deg1, deg2: tuples of the same length to compare degrees 
+    
+    Outputs:
+    return True is deg1 <= deg2 and False o/w
+    """
+    diff = np.subtract(deg2, deg1)
+    return max(diff) >= 0
+
 

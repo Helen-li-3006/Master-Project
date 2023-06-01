@@ -5,15 +5,24 @@ from funcs.func_utils import *
 from funcs.hilbert import *
 sy.init_printing(use_unicode=False, wrap_line=False)
 
-# Replicate of example from a reference
+# Replicate of example with single weight from 'Hilbert Functions and the Buchberger Algorithm' (CARLO TRAVERSO)
 x = sy.symbols('x_0:4')
 Ims = [(0,0,3,0), (0,0,0,4)]
 # Example uses Lex ordering
 W = sy.Matrix([[1,1,1,1]])
-
 hilb, l = hilbert(Ims, W, x)
-hilbnum = hilbinumerator(Ims, W, x, sy.symbols('l'))
+hilbnum = hilbinumerator(Ims, W, x, l)
 print('Numerator of the Hilbert series is:', hilbnum)
 print('Full Hilbert series is ', hilb)
-print('Expanded series up to order 5 is', hilb_expand(hilb, l, [5]))
 
+# Example of multi-degree hilbert function from Multigraded Hilbert Functions and Buchberger Algorithm
+x = sy.symbols('x_0:4')
+W = sy.Matrix([[1,1,2,1], [3,1,1,1]])
+# leading terms of the ideal 
+Ims = [(1,0,0,1), (0,1,0,1)]
+hilb, l = hilbert(Ims, W, x)
+hilbnum = hilbinumerator(Ims, W, x, l)
+print('Numerator of the Hilbert series is:', hilbnum)
+print('Full Hilbert series is ', hilb)
+
+#print(hilb_expand(hilb, l, [3]))
