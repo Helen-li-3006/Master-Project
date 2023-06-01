@@ -26,7 +26,7 @@ def hilbinumerator(Ims, W, gens, l):
     r = W.shape[0]
     ind = 0
     if len(Ims) == 0:
-        numi = 1
+        numi = 1.
         return numi
     else:
         xalp = Ims[ind]
@@ -46,7 +46,7 @@ def hilbinumerator(Ims, W, gens, l):
             for lin_term in J_lin:
                 # Using result 3, calculate numerator of ideal J
                 pow = weighted_deg(W, lin_term)
-                numJ = (1. - sy.polys.Poly.from_dict({tuple(pow):1.}, l)) * numJ1
+                numJ = (1. - sy.polys.Poly.from_dict({tuple(pow):1.}, l)) * numJ
             alp_j = weighted_deg(W, Ims[j])
             numi = numi - sy.polys.Poly.from_dict({tuple(alp_j):1.}, l) * numJ
         return numi
@@ -62,7 +62,7 @@ def hilbert(Ims, W, gens):
     W: Weight system of multi-grading
 
     Output:
-    hilb: hilbert series of the quotient ring K[x]/Ims
+    hilb: hilbert series of the quotient ring K[x]/Ims as a symp expression
     """
     # Define the symbols for lambdas as l_0, ...,l_r-1
     r = W.shape[0]
@@ -72,9 +72,11 @@ def hilbert(Ims, W, gens):
     for i in range(n):
         xi= tuple(np.eye(1,n,i).astype(int).reshape(-1))
         Wij = weighted_deg(W, xi)
-        hilb = sy.factor(hilb/(1.- sy.polys.Poly.from_dict({tuple(Wij):1.},l)))
-    return hilb, l
+        hilb = sy.factor(hilb/(1.- sy.polys.Poly.from_dict({Wij:1.},l)))
+    return hilb.as_expr(l), l
 
+
+# Change this function to be compatible for both multivariate and univariate case
 def hilb_expand(hilb, ls, orders):
     """
     Expand the hilbert series up to an order
@@ -82,19 +84,19 @@ def hilb_expand(hilb, ls, orders):
     Inputs:
     hilb: Hilbert series
     ls: generators of the hilbert series (l_1, ..., l_r)
-    orders: list of orders for each variabelt to expand up to
+    orders: list of orders for each variables to expand up to (d_1, ..., d_r)
     
     Output: 
-    exp_hilb: Expanded 
+    exp_hilb: Expanded hilbert series with each variable up to d_i
     """
     exp_hilb = hilb
-    for i in range(len(orders)):
-        exp_hilb = exp_hilb.series(ls[i], 0, orders[i])
-    return exp_hilb.as_poly()
+    for ind in range(len(orders)):
+        exp_hilb = sy.series(exp_hilb, ls[ind], 0, orders[ind]).removeO()
+    return exp_hilb
         
 
 
-def molien(G, form=None, haar=None):
+def molien(G, form = None, haar = None):
     """
     Compute the Molien series for finite group or compact Lie algebra
     with a given normalised Haar measure
