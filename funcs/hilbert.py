@@ -79,7 +79,7 @@ def hilbert(Ims, W, gens):
 # Change this function to be compatible for both multivariate and univariate case
 def hilb_expand(hilb, ls, orders):
     """
-    Expand the hilbert series up to an order
+    Expand the hilbert series up to an order. This can also be used for expanding molien series. 
 
     Inputs:
     hilb: Hilbert series
@@ -96,17 +96,16 @@ def hilb_expand(hilb, ls, orders):
         
 
 
-def molien(G, form = None, haar = None):
+def molien(G, id, l):
     """
-    Compute the Molien series for finite group or compact Lie algebra
-    with a given normalised Haar measure
-    
-    Inputs:
-    G: List of group elements (finite group) under some respresentation or 
-    List of generators (compact Lie algebra) under some representation.
-    form: 'finite' or 'CLA' for finite group (sum) or compact Lie algebra
-    (integral wrt normalised haar measure)
-    haar: function 
-    """
+    Compute the Molien series for finite group
 
-    return None
+    Inputs:
+    G: List of group elements (finite group) under some respresentation (matrix)
+    id: identity of G under the same representation (matrix)
+    l: variable for molien series (lambda)
+    """
+    mol = 0.0
+    for rep in G:
+        mol += 1.0/((id - l*rep).det())
+    return (1/len(G))*mol

@@ -25,4 +25,9 @@ hilbnum = hilbinumerator(Ims, W, x, l)
 print('Numerator of the Hilbert series is:', hilbnum)
 print('Full Hilbert series is ', hilb)
 
-#print(hilb_expand(hilb, l, [3]))
+# Test for Molien series using C4 under 2x2 matrix representation
+G = [sy.Matrix([[1,0],[0,1]]), sy.Matrix([[0,1],[-1,0]]), sy.Matrix([[-1,0],[0,-1]]), sy.Matrix([[0,-1],[1,0]])]
+id = sy.Matrix([[1,0],[0,1]])
+l = sy.symbols('l')
+mol = molien(G, id, l)
+print('Molien series for C4 is ', mol)

@@ -111,7 +111,7 @@ def tup_lcm(mon1, mon2):
         lcm.append(np.max([mon1[i], mon2[i]]))
     return tuple(lcm)
 
-def S_poly(f, g, W, gens, dom):
+def S_poly(f, g, W, gens, dom = None):
     """
     Compute the S-polynomial of polynomials f and g wrt weight system 
     W (which represents a term ordering)
@@ -133,8 +133,10 @@ def S_poly(f, g, W, gens, dom):
     lt_lcm = tup_lcm(f_lt, g_lt) #power tuple
     num = sy.polys.Poly.from_dict({lt_lcm: 1.}, gens=gens, domain=dom)
     S = (num/sy.polys.Poly.from_dict({f_lt:f_dict.get(f_lt)},gens=gens, domain=dom))*f - (num/sy.polys.Poly.from_dict({g_lt:g_dict.get(g_lt)},gens=gens, domain=dom))*g
-    return S.set_domain(dom)
-
+    if dom:
+        return S.set_domain(dom)
+    else:
+        return S
 
 def is_divisible(f1, f2, W, gens):
     """
@@ -155,7 +157,7 @@ def is_divisible(f1, f2, W, gens):
     else:
         return True
 
-def normalf(W, F, f, gens, dom):
+def normalf(W, F, f, gens, dom=None):
     """
     Impelemnt division algorithm to check if polynomial f is in the span of F
 
@@ -194,8 +196,8 @@ def min_deg(poly, gens):
     
     Inputs:
     poly: Hilbert function as a polynomial
-    grading: m x s sympy matrix representing a weight system corresponds to a (multi) grading
-    Outputs: Power tuple of the minimal degree term w.r.t grading
+    Outputs: 
+    Power tuple of the minimal degree term
 
     """
     pows = [np.array(key) for key in poly.as_dict().keys()]
