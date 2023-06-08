@@ -102,15 +102,11 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
         if len(delta_list) == 0:
             return GB, ['exhausted deltas']
         delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
-    #print('C, D', c_delta, D_epsilon)
     while len(S) > 0:
         # Get slice where deg_U <= d and deg_W = delta_epsilon
-        #slice = [pair for pair in delta_eps_S if compare_degs(weighted_deg(U, leading_term(U, S_poly(F[pair[0]], F[pair[1]], U, x), x)), tuple(d))]
-        #print(delta_eps_S, 'slice')
         pair = delta_eps_S.pop()
         S.remove(pair)
         g = normalf(U, GB, S_poly(GB[pair[0]], GB[pair[1]], U, x, dom), x, dom)
-        #print(g)
         if not g.is_zero:
             GB.append(g)
             F_hthc.append(leading_term(U, g, x, inc_coef=True))
@@ -123,16 +119,10 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
                           compare_degs(weighted_deg(U,leading_term(U, S_poly(GB[i], GB[m-1], U, x, dom), x)), tuple(d)) and 
                           compare_degs(delta_epsilon, weighted_deg(W,leading_term(W, S_poly(GB[i], GB[m-1], W, x, dom), x)))]
             S.extend(S_im_slice)
-            #delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
-            #print(E, 'E')
-            #print(D_epsilon, 'D')
-            #delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
-            #print(S, 'after S_im_slice')
             if D_epsilon == 0:
                 # Move to the next epsilon if there are other possible epsilons
                 if len(E) > 0: 
                     E, delta_epsilon, D_epsilon, delta_eps_S = update_epsilon(E, GB, HP_diff, S, W, x, dom)
-                    #print(delta_eps_S, 'slice after D exhausted - more possible epsilons')
                 elif len(E) == 0 or len(delta_eps_S) == 0:
                     # Case when no more possible epsilons are available - move to a different delta
                     # Re-calculate hp functions and epsilon, E, S with respect to the new GB
@@ -145,8 +135,6 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
                     if hp_diff == 0:
                         return GB, ['identical hp series']
                     delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom, update_S=True)
-                    #print(delta_eps_S, 'slice after D exhausted - no more possible eps')
-                    #print(E, 'Epsilon_list')
             # When there are still epsilon options, choose the next smallest (delta,epsilon) degree and repeat the process
             if c_delta == 0:
                 # Exhausted all possible delta-degree polyomials, recompute hp series and move on to the next delta degree
@@ -160,7 +148,6 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
                 # Compute the new delta list
                 delta_list = mod_merge_sort(list(sy.poly(hp_diff).as_dict().keys()))[::-1]
                 delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom, update_S=True)
-                #print(delta_eps_S, 'slice after C exhausted')
     return GB, ['end of iterations']
 
 

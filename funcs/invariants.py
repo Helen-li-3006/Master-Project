@@ -121,9 +121,7 @@ def inv_ring(G, mol, t, x, W, d):
         M = [tup_mon(c, y) for c in y_comb]
         M = [M_subs(m ,y, HT) for m in M]
         V = [mon for mon in all_V if mon not in M]
-        print(V, 'V final')
         Q = [reynold(mon, G, x) for mon in V]
-        print('Q original', Q)
         Q = list(set([q for q in Q if q != 0]))
         Q_mat = polynomial_to_matrix(all_V, Q)
         Q_mat, rows = Q_mat.rref()
@@ -132,7 +130,6 @@ def inv_ring(G, mol, t, x, W, d):
         P = []
         for i in range(len(Q)):
             h = normalf(eli_W, GB, sy.poly(Q[i],x+y), x+y)
-            print('h', h)
             # Check if h contains x_i variables
             if bool(h.free_symbols.intersection(x)):
                 x_sub = [0.]*len(x)
@@ -148,7 +145,6 @@ def inv_ring(G, mol, t, x, W, d):
         # Extend the induced weight order to extended invariants
         inv_degs = [weighted_deg(N,leading_term(N,inv,y))[0] for inv in invs]
         ind_W = sy.Matrix([inv_degs])
-        #print(s, P[s-1])
         GB.extend([y[m+i] - P[i] for i in range(s)])
         GB = [sy.poly(poly, x+y) for poly in GB]
         GB, message = dtrunc_groebner(eli_W, eli_W.shape[0], eli_W, k, GB, mol.as_expr(), x+y, l, dom=None)
