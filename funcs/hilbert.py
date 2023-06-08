@@ -28,6 +28,10 @@ def hilbinumerator(Ims, W, gens, l):
     if len(Ims) == 0:
         numi = 1.
         return numi
+    elif len(Ims) == 1:
+        alp_deg = weighted_deg(W, Ims[0])
+        numi = 1. - sy.polys.Poly.from_dict({tuple(alp_deg):1.}, l)
+        return numi
     else:
         xalp = Ims[ind]
         ind += 1
@@ -107,5 +111,5 @@ def molien(G, id, l):
     """
     mol = 0.0
     for rep in G:
-        mol += 1.0/((id - l*rep).det())
+        mol += 1.0/((id - l[0]*rep).det())
     return (1/len(G))*mol

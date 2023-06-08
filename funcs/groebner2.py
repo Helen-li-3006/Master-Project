@@ -81,6 +81,10 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
     # Initialise parameters
     delta_list = mod_merge_sort(list(sy.poly(hp_diff, ls).as_dict().keys()))[::-1]
     delta = delta_list.pop()
+    if compare_degs(tuple(d), delta):
+        return GB, ['reached max order d'] # no polynomials to find
+    if delta == tuple([0]*s):
+        return GB
     c_delta = sy.poly(hp_diff).as_dict()[delta]
     E = mod_merge_sort([key for key in sy.poly(HP_diff).as_dict().keys() if key[:s] == delta])[::-1]
     delta_epsilon = E.pop()
@@ -89,16 +93,15 @@ def dtrunc_groebner(W, s, U, d, F, hp, x, l, dom):
     U_lcm = {(i,j) : tuple(weighted_deg(U, tup_lcm(F_ht[i], F_ht[j]))) for j in range(m) for i in range(j)}
     W_lcm = {(i,j) : tuple(weighted_deg(W, tup_lcm(F_ht[i], F_ht[j]))) for j in range(m) for i in range(j)}
     S = [key for key in W_lcm.keys() if compare_degs(U_lcm[key], tuple(d)) and compare_degs(delta_epsilon, W_lcm[key])]
-    # Initialise the graded syzygies
-    delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
-    # List of all possible delta without changing coefficients (no added GB terms) in descending order
-    if compare_degs(tuple(d), delta):
-        return GB, ['reached max order d'] # no polynomials to find
-    # Compute the graded delta_epsilon degree of S_polynomials 
-    if len(delta_eps_S) == 0:
-        delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
     if len(S) == 0:
         return GB, ['no available pairs']
+    # Initialise the graded syzygies
+    delta_eps_S = [pair for pair in S if weighted_deg(W, leading_term(W, S_poly(GB[pair[0]], GB[pair[1]], W, x, dom), x)) == delta_epsilon]
+    # Compute the graded delta_epsilon degree of S_polynomials 
+    while len(delta_eps_S) == 0:
+        if len(delta_list) == 0:
+            return GB, ['exhausted deltas']
+        delta_list, E, delta, delta_epsilon, delta_eps_S, c_delta, D_epsilon = update_S_slice(delta_list, hp_diff, HP_diff, S, s, W, GB, x, dom)
     #print('C, D', c_delta, D_epsilon)
     while len(S) > 0:
         # Get slice where deg_U <= d and deg_W = delta_epsilon

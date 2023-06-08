@@ -28,6 +28,7 @@ print('Full Hilbert series is ', hilb)
 # Test for Molien series using C4 under 2x2 matrix representation
 G = [sy.Matrix([[1,0],[0,1]]), sy.Matrix([[0,1],[-1,0]]), sy.Matrix([[-1,0],[0,-1]]), sy.Matrix([[0,-1],[1,0]])]
 id = sy.Matrix([[1,0],[0,1]])
-l = sy.symbols('l')
+l = sy.symbols('l_:1')
 mol = molien(G, id, l)
 print('Molien series for C4 is ', mol)
+print('Molien series up to degree 4 is', hilb_expand(mol, l, [5]))

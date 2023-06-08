@@ -202,7 +202,7 @@ def min_deg(poly, gens):
     """
     pows = [np.array(key) for key in poly.as_dict().keys()]
     pows_inc = mod_merge_sort(pows)
-    return pows_inc[0] #return minimal power tuple
+    return tuple(pows_inc[0]) #return minimal power tuple
 
 def compare_degs(deg1, deg2):
     """
