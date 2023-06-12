@@ -1,5 +1,5 @@
 # Master-Project
-Repository that contains a package built with Sympy that implements algorithms to find ring of invariant polynomials for a polynomial ring for a group representation. The modules are separated by functionality (in the order of implementation):
+Repository that contains a package built with Sympy that implements algorithms to find ring of invariant polynomials for a polynomial ring for a group representation. The modules are separated by functionality (in the order of implementation):\\
 func_utils ---------- contains all utility functions that is used in matrix form of graded algebra
 hilbert ------------- contains the routine (hilbert series) and subruotine (hilbert series numerator) 
                       for computing hilbert series for a given weight system
